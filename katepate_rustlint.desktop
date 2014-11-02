@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Service
+ServiceTypes=Kate/PythonPlugin
+X-KDE-Library=rustlint
+Name=Rust linting
+X-Python-2-Compatible=true
