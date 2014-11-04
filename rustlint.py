@@ -17,6 +17,8 @@ def parseCheckString(s):
         match = ERROR_RE.findall(line)
         if match:
             match = match[0]
+            if "file not found for module" in match[2]:
+                continue
             error_lines.append([int(match[0]), match[2].strip()])
 
     return error_lines
