@@ -41,7 +41,8 @@ def getCargoData(url):
     return data
 
 class RustError:
-    def __init__(self, line, message):
+    def __init__(self, filename, line, message):
+        self.filename = filename
         self.line = line
         self.message = message
 
@@ -60,11 +61,11 @@ def rustParseString(s):
             match = match[0]
             if "file not found for module" in match[2]:
                 continue
-            error_lines.append(RustError(int(match[0]), match[2].strip()))
+            error_lines.append(RustError(None, int(match[0]), match[2].strip()))
 
     return error_lines
 
-COMPILE_ERROR_RE = re.compile(r"[^:]+:(\d+):(\d+):.*error: (.+)")
+COMPILE_ERROR_RE = re.compile(r"([^:]+):(\d+):(\d+):.*error: (.+)")
 COMPILE_ERROR_NOLINE_RE = re.compile(r"error: (.+)")
 def rustTypecheckFile(url):
     cargo_data = getCargoData(url)
@@ -89,7 +90,7 @@ def rustTypecheckFile(url):
         match = COMPILE_ERROR_RE.findall(line)
         if match:
             match = match[0]
-            error_lines.append(RustError(int(match[0]), match[2].strip()))
+            error_lines.append(RustError(match[0], int(match[1]), match[3].strip()))
         else:
             match = COMPILE_ERROR_NOLINE_RE.findall(line)
             if match:
@@ -104,11 +105,25 @@ from libkatepate.errors import showOk, showErrors, clearMarksOfError
 global documentLastErrors
 documentLastErrors = {}
 
-def cleanupDocErrors(doc):
-    del documentLastErrors[doc]
-
 COMPILE_ERR = 1
 PARSE_ERR = 0
+def getDocumentErrorKey(doc, typ):
+    if typ == PARSE_ERR:
+        return doc
+    else:
+        cargo_dir = findCargoProjectDir(doc.url())
+        if cargo_dir:
+            return cargo_dir
+        else:
+            return doc
+
+def cleanupDocErrors(doc):
+    pkey = getDocumentErrorKey(doc, PARSE_ERR)
+    if pkey in documentLastErrors:
+        del documentLastErrors[pkey]
+    # ckey might be in use by another document.. just leave them there.
+    # there's just one per cargo project anyway.
+
 def setDocErrors(doc, typ, errors):
     mark_iface = doc.markInterface()
 
@@ -117,10 +132,12 @@ def setDocErrors(doc, typ, errors):
             if mark_iface.mark(line) == mark_iface.Error:
                 mark_iface.removeMark(line, mark_iface.Error)
 
-    if not doc in documentLastErrors:
-        documentLastErrors[doc] = {COMPILE_ERR: [], PARSE_ERR: []}
+    key = getDocumentErrorKey(doc, typ)
+
+    if not key in documentLastErrors:
+        documentLastErrors[key] = {COMPILE_ERR: [], PARSE_ERR: []}
         doc.aboutToClose.connect(cleanupDocErrors)
-    documentLastErrors[doc][typ] = errors
+    documentLastErrors[key][typ] = errors
 
     updateErrlist()
 
@@ -139,20 +156,24 @@ def updateErrlist(view=None, *args, **kwargs):
     compileErrorWidget.clear()
 
     doc = view.document()
-    if not doc in documentLastErrors:
-        return
+    pkey = getDocumentErrorKey(doc, PARSE_ERR)
+    ckey = getDocumentErrorKey(doc, COMPILE_ERR)
 
-    for error in documentLastErrors[doc][PARSE_ERR]:
-        if error.line:
-            parseErrorWidget.addItem("Line " + str(error.line) + ": " + error.message)
-        else:
-            parseErrorWidget.addItem(error.message)
+    if pkey in documentLastErrors:
+        for error in documentLastErrors[pkey][PARSE_ERR]:
+            if error.line:
+                parseErrorWidget.addItem("line " + str(error.line) + ": " + error.message)
+            else:
+                parseErrorWidget.addItem(error.message)
 
-    for error in documentLastErrors[doc][COMPILE_ERR]:
-        if error.line:
-            compileErrorWidget.addItem("Line " + str(error.line) + ": " + error.message)
-        else:
-            compileErrorWidget.addItem("Error: " + error.message)
+    if ckey in documentLastErrors:
+        for error in documentLastErrors[ckey][COMPILE_ERR]:
+            msg = ""
+            if error.filename:
+                msg = msg + error.filename + ": "
+            if error.line:
+                msg = msg + "line " + str(error.line) + ": "
+            compileErrorWidget.addItem(msg + error.message)
 
 def lintRust():
     doc = kate.activeDocument()

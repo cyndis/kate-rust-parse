@@ -2,6 +2,6 @@
 
 Does live parse error checking and on-save compilation checking for Rust code using rustc.
 
-The crate root is not detected, so compilation checking while editing other files will be wrong.
-Cargo is also not supported (it doesn't have a way to pass --no-trans).
-
+When using Cargo, the Cargo primary target will be used for compilation checking. This script
+doesn't actually use Cargo for building and doesn't build project dependencies, so please manually
+build the project using Cargo first.
