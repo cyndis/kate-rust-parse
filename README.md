@@ -1,3 +1,7 @@
-# Kate rust parse checking
+# Rust error checking in Kate
 
-Note: despite the plugin name, this doesn't do any compiling or linting so far.
+Does live parse error checking and on-save compilation checking for Rust code using rustc.
+
+The crate root is not detected, so compilation checking while editing other files will be wrong.
+Cargo is also not supported (it doesn't have a way to pass --no-trans).
+
