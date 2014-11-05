@@ -2,6 +2,43 @@
 
 import subprocess
 import re
+import json
+import os.path
+
+def findCargoProjectDir(url):
+    dir = url.directory()
+
+    if os.path.isfile(dir + "/Cargo.toml") or os.path.isfile(dir + "/cargo.toml"):
+        return dir
+    else:
+        up = url.upUrl()
+        if up == url:
+            return None
+        return findCargoProjectDir(up)
+
+def getCargoData(url):
+    if not url.isLocalFile():
+        return None
+
+    dir = findCargoProjectDir(url)
+    if not dir:
+        return None
+
+    cargo_proc = subprocess.Popen(["cargo", "read-manifest", "--manifest-path="+dir],
+                                    stdout=subprocess.PIPE)
+    out, _ = cargo_proc.communicate()
+
+    manifest = json.loads(out.decode('utf-8'))
+
+    main_target = manifest["targets"][0]
+
+    data = {
+        "is_lib": main_target["kind"] == ["lib"],
+        "dep_path": dir + "/target/deps",
+        "root": main_target["src_path"]
+    }
+
+    return data
 
 class RustError:
     def __init__(self, line, message):
@@ -30,8 +67,19 @@ def rustParseString(s):
 COMPILE_ERROR_RE = re.compile(r"[^:]+:(\d+):(\d+):.*error: (.+)")
 COMPILE_ERROR_NOLINE_RE = re.compile(r"error: (.+)")
 def rustTypecheckFile(url):
-    process = subprocess.Popen(["rustc", "--no-trans", url.pathOrUrl()], 0, None, None,
-                               None, subprocess.PIPE)
+    cargo_data = getCargoData(url)
+
+    args = ["rustc", "--no-trans"]
+    if cargo_data:
+        if cargo_data["is_lib"]:
+            args.append("--crate-type")
+            args.append("lib")
+        args.append("-L" + cargo_data["dep_path"])
+        args.append(cargo_data["root"])
+    else:
+        args.append(url.pathOrUrl())
+
+    process = subprocess.Popen(args, 0, None, None, None, subprocess.PIPE)
     _, err = process.communicate()
 
     error_lines = []
