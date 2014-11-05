@@ -106,7 +106,6 @@ def updateErrlist(view=None, *args, **kwargs):
         else:
             compileErrorWidget.addItem("Error: " + error.message)
 
-@kate.action
 def lintRust():
     doc = kate.activeDocument()
 
@@ -150,7 +149,7 @@ def initRustlint():
     msgview = kate.mainInterfaceWindow().createToolView("rustlint_plugin",
                                                         kate.Kate.MainWindow.Bottom,
                                                         SmallIcon("task-attention"),
-                                                        "Rust Parse Errors")
+                                                        "Rust Errors")
 
     parent = QWidget(msgview)
     box = QHBoxLayout()
