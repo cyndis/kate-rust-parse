@@ -46,7 +46,7 @@ class RustError:
         self.line = line
         self.message = message
 
-PARSE_ERROR_RE = re.compile(r"<anon>:(\d+):(\d+):.*error: (.+)")
+PARSE_ERROR_RE = re.compile(r"<anon>:(\d+):(\d+):.* error: (.+)")
 def rustParseString(s):
     process = subprocess.Popen(["rustc", "--parse-only", "-"], 0, None, subprocess.PIPE, None,
                                subprocess.PIPE)
@@ -65,8 +65,8 @@ def rustParseString(s):
 
     return error_lines
 
-COMPILE_ERROR_RE = re.compile(r"([^:]+):(\d+):(\d+):.*error: (.+)")
-COMPILE_ERROR_NOLINE_RE = re.compile(r"error: (.+)")
+COMPILE_ERROR_RE = re.compile(r"([^:]+):(\d+):(\d+):.*\serror: (.+)")
+COMPILE_ERROR_NOLINE_RE = re.compile(r"^error: (.+)")
 def rustTypecheckFile(url):
     cargo_data = getCargoData(url)
 
@@ -94,7 +94,11 @@ def rustTypecheckFile(url):
         else:
             match = COMPILE_ERROR_NOLINE_RE.findall(line)
             if match:
-                error_lines.append(RustError(None, match[0].strip()))
+                if cargo_data:
+                    fn = cargo_data["root"]
+                else:
+                    fn = None
+                error_lines.append(RustError(fn, None, match[0].strip()))
 
     return error_lines
 
